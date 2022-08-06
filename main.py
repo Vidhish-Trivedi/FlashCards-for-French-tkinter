@@ -18,43 +18,71 @@ list_known = []
 clk = None
 
 ################  FILE READ  ##################
-df = pd.read_csv(data_file)
-data_dict = df.to_dict()
+# Try to open file with previous learning progress, if exists.
+try:
+    file_test = open('./data/to_learn.csv')
+# Incase of exception, open default data_file and create a new file to save progress.
+except FileNotFoundError:
+    df = pd.read_csv(data_file)
+    with open('./data/to_learn.csv', mode='w') as file:
+        file.write('French,English\n')
+else:
+    df = pd.read_csv('./data/to_learn.csv')
+finally:
+    data_dict = df.to_dict()
 
 ################  FLIP CARD  ##################
 def flip_card(seconds):
     global i, flips, list_known, clk
     if(i < len(data_dict['French'])):
         # Updating card information appropriately.
-        if(flips%2 == 0 and i not in list_known):
-            card.itemconfig(card_side, image=cb)
-            card.itemconfig(card_lang, text='English', font=font1, fill='#141E61')
-            card.itemconfig(card_word, text=data_dict['English'][i], font=font2, fill='#141E61')
+        if(data_dict['French'][i] == 'False'):
             i += 1
-        elif(flips%2 == 1 and i not in list_known):
-            card.itemconfig(card_side, image=cf)
-            card.itemconfig(card_lang, text='French', font=font1, fill='black')
-            card.itemconfig(card_word, text=data_dict['French'][i], font=font2, fill='black')
+            if(flips%2 == 0):
+                flips += 1
+            else:
+                flips += 2
+            window.after_cancel(clk)
+            clk = window.after(1, flip_card, 3)
         else:
-            pass
-        flips += 1
-        if(i == len(data_dict['French'])):
-            i = 0
-            flips = 0
-        # Recursive call every 3 seconds.
-        clk = window.after(seconds*1000, flip_card, seconds)
+            if(flips%2 == 0):
+                card.itemconfig(card_side, image=cb)
+                card.itemconfig(card_lang, text='English', font=font1, fill='#141E61')
+                card.itemconfig(card_word, text=data_dict['English'][i], font=font2, fill='#141E61')
+                i += 1
+                flips += 1
+            elif(flips%2 == 1):
+                card.itemconfig(card_side, image=cf)
+                card.itemconfig(card_lang, text='French', font=font1, fill='black')
+                card.itemconfig(card_word, text=data_dict['French'][i], font=font2, fill='black')
+                flips += 1
+            else:
+                pass
+            if(i >= len(data_dict['French'])):
+                i = 0
+                flips = 0
+            # Recursive call every 3 seconds.
+            clk = window.after(seconds*1000, flip_card, seconds)
     else:
         print('DONE!!!!!!!!!!')
 
 ###########  TICK MARK BUTTON  #################
 def known_word():  ########################################  DEBUG. list_known.append(i)
-    global clk
+    global clk, data_dict
+    data_dict['French'][i] = 'False'
+    data_dict['English'][i] = 'False'
     window.after_cancel(clk)
     clk = window.after(1, flip_card, 3)
 
 ###########  CROSS MARK BUTTON  ################
 def unknown_word():
-    global clk
+    global clk, i, data_dict
+
+    ###########  WRITE TO FILE  ###########
+    # Filter out keys with values != False, these are the words to learn.
+    with open('./data/to_learn.csv', mode='a') as file:
+        file.write(f"{data_dict['French'][i]},{data_dict['English'][i]}\n")
+
     window.after_cancel(clk)
     clk = window.after(1, flip_card, 3)
 
@@ -89,3 +117,7 @@ b_right.grid(column=1, row=1)
 
 # Keep the window displayed.
 window.mainloop()
+
+# TODO: Bug when clicking cross button (when card displays
+#       English word), writes the next (not current) word
+#       to the to_learn.csv file.
